@@ -1,0 +1,159 @@
+name: Build and release einsums-clangd
+
+# Triggers:
+#   - Tag push (v*): full release build, attach tarballs to a GitHub Release
+#     under stable asset names so the /releases/latest/download/ URL pattern
+#     works for downstream auto-updaters (Studio, etc.).
+#   - workflow_dispatch: on-demand build, optionally with a custom LLVM tag
+#     for users who need a frontend version different from the pin. Output
+#     goes to workflow artifacts only — does NOT publish a release.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      llvm_tag:
+        description: 'LLVM tag to vendor (default: pin in clangd-build/CMakeLists.txt)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write   # for softprops/action-gh-release on tag pushes
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest      # Apple Silicon (M-series)
+            target: darwin-arm64
+          - os: macos-13          # Intel
+            target: darwin-x86_64
+          - os: ubuntu-22.04      # x86_64 Linux, glibc 2.35 floor
+            target: linux-x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            brew install ninja
+          else
+            sudo apt-get update
+            sudo apt-get install -y ninja-build
+          fi
+
+      # ccache caches LLVM object files. First build per-LLVM-tag is 30-60 min;
+      # subsequent runs against the same tag drop to ~10-20 min on warm cache.
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.target }}-${{ inputs.llvm_tag || hashFiles('clangd-build/CMakeLists.txt') }}
+          max-size: 5G
+
+      - name: Configure
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXTRA=()
+          if [[ -n "${{ inputs.llvm_tag }}" ]]; then
+            echo "Using overridden LLVM tag: ${{ inputs.llvm_tag }}"
+            EXTRA+=(-DEINSUMS_LLVM_GIT_TAG="${{ inputs.llvm_tag }}")
+          fi
+          cmake -S clangd-build -B build -GNinja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              "${EXTRA[@]}"
+
+      - name: Build clangd + resource-dir symlink
+        shell: bash
+        run: cmake --build build
+
+      - name: Smoke-test the binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          build/bin/clangd --version
+          # Resource-dir symlink should resolve to a populated include dir.
+          ls -la build/lib/clang/
+          test -d "$(ls -d build/lib/clang/*/include | head -1)"
+
+      - name: Stage package
+        id: stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAJOR=$(basename "$(ls -d build/lib/clang/*)")
+          LLVM_TAG=$(grep '^EINSUMS_LLVM_GIT_TAG:' build/CMakeCache.txt | cut -d= -f2)
+          STAGE=einsums-clangd
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE/bin" "$STAGE/lib/clang"
+          cp build/bin/clangd "$STAGE/bin/"
+          # Dereference the symlink so the tarball is self-contained.
+          cp -RL "build/lib/clang/$MAJOR" "$STAGE/lib/clang/$MAJOR"
+          cp LICENSE.txt "$STAGE/"
+          # VERSION file lets Studio compare the bundled clangd against the
+          # user's compiler at install time.
+          cat > "$STAGE/VERSION" <<EOF
+          einsums_clangd_version=${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', github.sha) }}
+          llvm_tag=$LLVM_TAG
+          llvm_version_major=$MAJOR
+          target=${{ matrix.target }}
+          built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            strip "$STAGE/bin/clangd"
+          fi
+          echo "Staged contents:"
+          find "$STAGE" -maxdepth 3 -type f -o -type l | head -30
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+
+      # Tarball naming:
+      #   * Tag releases use a STABLE name (no version) so consumers can hit
+      #     /releases/latest/download/einsums-clangd-<target>.tar.gz forever.
+      #     The version is captured by the GitHub release tag and the VERSION
+      #     file inside the tarball.
+      #   * workflow_dispatch builds suffix the SHA so multiple runs don't clash.
+      - name: Tarball + checksum
+        id: pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            NAME="einsums-clangd-${{ matrix.target }}.tar.gz"
+          else
+            NAME="einsums-clangd-${GITHUB_SHA::8}-${{ matrix.target }}.tar.gz"
+          fi
+          tar -czf "$NAME" einsums-clangd
+          shasum -a 256 "$NAME" > "$NAME.sha256"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          ls -lh "$NAME" "$NAME.sha256"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            ${{ steps.pack.outputs.name }}
+            ${{ steps.pack.outputs.name }}.sha256
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release (tag pushes only)
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.pack.outputs.name }}
+            ${{ steps.pack.outputs.name }}.sha256
+          fail_on_unmatched_files: true
+          generate_release_notes: true

@@ -1,0 +1,36 @@
+---
+# We'll use defaults from the LLVM style, but with 4 columns indentation.
+BasedOnStyle: LLVM
+IndentWidth: 4
+---
+Language: Cpp
+ColumnLimit: 140
+IncludeBlocks: Regroup
+AlwaysBreakTemplateDeclarations: Yes
+AllowShortFunctionsOnASingleLine: InlineOnly
+AlignConsecutiveMacros: true
+IndentPPDirectives: AfterHash
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+QualifierAlignment: Right
+IncludeCategories:
+  - Regex: '^<Einsums/Config/WarningsPrefix.hpp>'
+    Priority: 100
+  - Regex: '^<catch2/catch_all.hpp>'
+    Priority: 10
+  - Regex: '^<Einsums/Testing.hpp>'
+    Priority: 10
+  - Regex: '^<Einsums/Config.hpp>'
+    Priority: 1
+  - Regex: '^<Einsums/_.*\.hpp>'
+    Priority: 2
+  - Regex: '^<Einsums/.*\.h.*>'
+    Priority: 3
+  - Regex: '^<range/.*>'
+    Priority: 4
+  - Regex: '^<fmt/.*>'
+    Priority: 4
+  - Regex: '^<.*'
+    Priority: 5
+  - Regex: '.*'
+    Priority: 6

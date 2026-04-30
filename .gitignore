@@ -1,0 +1,106 @@
+/*build*/
+!clangd-build
+testing/consume/build
+.vscode/
+CMakePresets.json
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# CMake gitignore
+CMakeUserPresets.json
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+# Items specific to einsums
+*.h5
+.cache
+*timings.txt*
+*.coverage
+coverage.xml
+*.profraw
+*.profdata
+*.info
+
+# Visual Studio files
+.vs
+CMakeSettings.json
+
+# Emacs backups.
+*~
+
+# Documentation
+__pycache__
+docs/_doxygen
+docs/api
+docs/build
+
+# Random Apple stuff
+.DS_Store
+
+# JetBrains project files
+#.idea/*
+!.idea/misc.xml
+!.idea/modules.xml
+
+# File created by merge_yaml.py script
+conda.yml
+
+# Profiling files.
+*profile.txt*
+
+# Benchmark database and reports
+devtools/benchmarks/*.db
+benchmark_report.html
+
+# Einsums Studio per-user state (committed configs stay tracked above).
+.einsums-studio/project.json
+.einsums-studio/benchmarks.db
+.einsums-studio/benchmarks.db-shm
+.einsums-studio/benchmarks.db-wal
+.einsums-studio/benchmarks.json
+.einsums-studio/local-history/
+.einsums-studio/bookmarks.json
+.einsums-studio/recent-files.json
+.einsums-studio/snippets.json
+.einsums-studio/file-templates/
+
+# Claude Code per-user memory
+.claude/
