@@ -69,11 +69,15 @@ jobs:
             echo "Using overridden LLVM tag: ${{ inputs.llvm_tag }}"
             EXTRA+=(-DEINSUMS_LLVM_GIT_TAG="${{ inputs.llvm_tag }}")
           fi
+          # ``"${EXTRA[@]+"${EXTRA[@]}"}"`` — conditional array expansion. On
+          # macOS GHA runners bash is still 3.2; expanding an empty array under
+          # ``set -u`` trips "unbound variable". Bash 4.4+ fixed this. The
+          # ``${var+...}`` form yields nothing when var is unset/empty.
           cmake -S clangd-build -B build -GNinja \
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_C_COMPILER_LAUNCHER=ccache \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-              "${EXTRA[@]}"
+              "${EXTRA[@]+"${EXTRA[@]}"}"
 
       - name: Build clangd + resource-dir symlink
         shell: bash
