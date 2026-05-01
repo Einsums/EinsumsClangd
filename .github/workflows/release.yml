@@ -33,8 +33,6 @@ jobs:
         include:
           - os: macos-latest      # Apple Silicon (M-series)
             target: darwin-arm64
-          - os: macos-13          # Intel
-            target: darwin-x86_64
           - os: ubuntu-22.04      # x86_64 Linux, glibc 2.35 floor
             target: linux-x86_64
 
