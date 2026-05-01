@@ -145,6 +145,18 @@ endif()
 target_sources(clangd PRIVATE ${EINSUMS_TIDY_CHECK_SOURCES})
 target_include_directories(clangd PRIVATE "${_TIDY_DIR}")
 
+# ``EinsumsTidyModule.cpp`` does ``#include <clang-tidy/ClangTidyModule.h>``,
+# which on a developer's machine resolves via the conda env's
+# ``-isystem $CONDA_PREFIX/include`` (the env ships installed clang-tidy
+# headers under ``include/clang-tidy/``). On the GHA runner there's no conda
+# env, so we have to point the compiler at the vendored source tree
+# explicitly: clang-tools-extra/clang-tidy/ holds the in-tree headers, so
+# adding clang-tools-extra/ to the include path makes the bracket include
+# resolve to ``clang-tools-extra/clang-tidy/ClangTidyModule.h``.
+target_include_directories(clangd PRIVATE
+    "${llvm-project_SOURCE_DIR}/clang-tools-extra"
+)
+
 # Force the clang resource-headers (``__stddef.h``, ``__int_t.h``, …) to be
 # built as a prereq of clangd. Without this target, ``<build>/lib/clang/<v>/``
 # stays empty and clangd can't find ``__int64_t`` / friends when parsing
